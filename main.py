@@ -1,5 +1,12 @@
+from collections import namedtuple
 import pandas as pd
 import numpy as np
+
+Child = namedtuple('Child', 'value entropy')
+
+class TreeNode:
+    children = {}
+
 
 if __name__ == '__main__':
     data = pd.read_csv('data/figure_18-3.csv', sep=',').to_numpy()
