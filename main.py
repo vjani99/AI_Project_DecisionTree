@@ -82,23 +82,30 @@ class TreeNode:
 
 class Attribute():
     """Class to house details about a particular attribute as the decision tree."""
-    def __init__(self, name, outputs):
+    def __init__(self, name, outputs, outcomes):
         self.name = name
-        self.outputs = outputs
 
         # Find all unique types of attribute
-        self.types = np.unique(self.outputs)
+        self.types = np.unique(outputs)
+        self.type_count = {}
+
+        # Set initial frequencies
+        self.update_counts(outputs, outcomes)
+
+    def update_counts(self, outputs, outcomes):
+        """Given a row of all outputs for this attribute and outcomes for those outputs, store frequencies of
+        each output value."""
 
         # Create a dictionary of outcomes per type, defaulted to 0
         self.type_count = {a_type: [0, 0, 0] for a_type in self.types}
         print(f'--------------{self.name} types: {self.types}--------------\n')
-        for i, a_type in enumerate(self.outputs):
-            if self.outputs[i] == a_type:
-                if OUTCOMES[i]:
-                    self.type_count[a_type][0] += 1 # Positive
-                else:
-                    self.type_count[a_type][1] += 1 # Negative
-                self.type_count[a_type][2] += 1     # Total
+        for i, a_type in enumerate(outputs):
+            print(f'ith output: {outputs[i]}, a_type: {a_type}')
+            if outcomes[i]:
+                self.type_count[a_type][0] += 1     # Positive
+            else:
+                self.type_count[a_type][1] += 1     # Negative
+            self.type_count[a_type][2] += 1         # Total
         print(f'{self.name} frequencies [p, k, v]: {self.type_count}\n')
 
 
@@ -113,7 +120,8 @@ def goal_entropy(examples):
 
     # Calculate and return goal entropy of this example subset.
     # Note: A H(goal) of 1 means that there are equal # of positive and negative examples
-    return np.nan_to_num(-prob_p * np.log2(prob_p) - prob_n * np.log2(prob_n))
+    with np.errstate(divide='ignore', invalid='ignore'):
+        return np.nan_to_num(-prob_p * np.log2(prob_p) - prob_n * np.log2(prob_n))
 
 
 def aggregate_entropy(attribute, example_count):
@@ -146,39 +154,44 @@ if __name__ == '__main__':
 
     # Read in all attributes, AND the outcome in the last index
     EXAMPLES = np.array(data[1:, 1:ATTRIBUTE_COUNT+1], dtype=str)
-    EXAMPLES = np.atleast_2d(EXAMPLES)  # Ensure that a 1D array is still treated as 2D in all calculations.
-    # OUTCOMES = np.array(data[1:, ATTRIBUTE_COUNT], dtype=int)
 
-    # Goal entropy of ENTIRE data set
-    # print(f'--------------Goal entropy of ENTIRE data set: {goal_entropy(EXAMPLES):.2f}--------------\n\n')
-    #
-    # # Store attribute and its outputs (column) as an object in a dictionary.
-    # attributes = {}
-    # for i in range(0, EXAMPLES.shape[1]):
-    #     attributes[ATTRIBUTE_NAMES[i]] = Attribute(ATTRIBUTE_NAMES[i], EXAMPLES[:, i].tolist())
-    #
-    #     # Perform sample calculations of entropy on scanned examples
-    #     aggregate_entropy(attributes[ATTRIBUTE_NAMES[i]], EXAMPLES.shape[1])
-    #
-    # # Example tree node for textbook example
-    # root = TreeNode("Patrons")
-    # hungry = TreeNode("Hungry")
-    # root.children = {"None": False, "Some": True, "Full": hungry}
-    # typ = TreeNode("Type")
-    # hungry.children = {1: typ, 0: False}
-    # fri_sat = TreeNode("Fri/Sat")
-    # typ.children = {"French": True, "Italian": False, "Thai": fri_sat, "Burger": True}
-    # fri_sat.children = {0: False, 1: True}
-    #
-    # print(f'--------------Example Tree from Textbook--------------')
-    # root.print_tree()
-
-    # print()
-    # EXAMPLES = np.append(EXAMPLES, [EXAMPLES[0]], axis=0)
+    ###### Special cases for testing ######
+    # EXAMPLES = np.append(EXAMPLES, [EXAMPLES[0]], axis=0) # Unbalanced data set
     # print(EXAMPLES)
-    # EXAMPLES = EXAMPLES[0]
+    # EXAMPLES = EXAMPLES[0]    # A single example data set
+    ######################################
+
+    EXAMPLES = np.atleast_2d(EXAMPLES)  # Ensure that a 1D array is still treated as 2D in all calculations.
+
     mode(EXAMPLES)
     print(all_classes_same(EXAMPLES))
+
+    # Goal entropy of ENTIRE data set
+    print(f'--------------Goal entropy of ENTIRE data set: {goal_entropy(EXAMPLES):.2f}--------------\n\n')
+
+    attributes = {}
+    init_outcomes = get_outcomes(EXAMPLES)
+    for i in range(0, EXAMPLES.shape[1] - 1):
+        attributes[ATTRIBUTE_NAMES[i]] = Attribute(ATTRIBUTE_NAMES[i], EXAMPLES[:, i].T, init_outcomes)
+
+        # Perform sample calculations of entropy on scanned examples
+        aggregate_entropy(attributes[ATTRIBUTE_NAMES[i]], EXAMPLES.shape[0])
+
+    # Example tree node for textbook example
+    root = TreeNode("Patrons")
+    hungry = TreeNode("Hungry")
+    root.children = {"None": False, "Some": True, "Full": hungry}
+    typ = TreeNode("Type")
+    hungry.children = {1: typ, 0: False}
+    fri_sat = TreeNode("Fri/Sat")
+    typ.children = {"French": True, "Italian": False, "Thai": fri_sat, "Burger": True}
+    fri_sat.children = {0: False, 1: True}
+
+    print(f'--------------Example Tree from Textbook--------------')
+    root.print_tree()
+
+    print(f"Attribute count: {EXAMPLES.shape[1]}")
+    print(f"Example count: {EXAMPLES.shape[0]}")
 
     # Build tree through "learning"
     # root = DTL(EXAMPLES, attributes, None)
