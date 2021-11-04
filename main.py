@@ -5,8 +5,8 @@ import numpy as np
 from sys import maxsize
 
 
-# TODO: Implement DTL algorithm and sub procedures
 def DTL(examples, attributes, default):
+    """Implement a learning mode for decision tree via the DTL algorithm."""
     if examples.size == 0:
         # print(f"No more examples left for attributes: {attributes}")
         return default
@@ -26,7 +26,7 @@ def DTL(examples, attributes, default):
         # print(f"Best attribute: {best.name}")
         tree = TreeNode(best.name)
 
-        # Remove best attribute from dictionary (copy)
+        # Remove best attribute from dictionary (copy) for all subtrees.
         subset_attributes = attributes.copy()
         del subset_attributes[best.name]
 
@@ -39,18 +39,18 @@ def DTL(examples, attributes, default):
 
 
 def get_examples_by_type(examples, a_type, a_col_idx):
-    """Get subset of examples that match this attribute type"""
+    """Get subset of examples that match this attribute type."""
     return examples[np.where(examples[:, a_col_idx] == a_type)]
 
 
 def mode(examples):
+    """Get most common outcome in the examples, either true or false."""
     outcomes = get_outcomes(examples)    # Extract row of all outcomes
     counts = np.bincount(outcomes)       # Count occurrences of 0/1
 
     # print(f"counts {counts}")
     if counts.size != 1 and counts[0] == counts[1]:
-        print("Tie in outcomes, choosing False")
-
+        print("Tie in outcomes, defaulting to False")
     # TODO: This ALWAYS chooses the first max calculated for tie-breaking (0)... may want to randomize
     mode = counts.argmax()
     # print(f"Mode {mode}")
@@ -64,17 +64,16 @@ def get_outcomes(examples):
 
 
 def all_classes_same(examples):
+    """Return whether the outcomes of each example are all the same"""
     outcomes = get_outcomes(examples)           # Extract row of all outcomes
     return np.all(outcomes == outcomes[0])      # Return whether all occurrences are the same
 
 
 def choose_best_attribute(att_dict, examples):
+    # Calculate info gain for each attribute and return the best.
     max_info_gain = -maxsize
     best_attribute = None
-    outcomes = get_outcomes(examples)
-    # print(f'Examples: {examples}')
-    # print(f'Outcomes: {outcomes}')
-    # print(f'Remaining attributes: {[a.name for a in att_dict.values()]}')
+
     for a in att_dict.values():
         curr_gain = info_gain(a, examples)
         # print(f"{a.name} info gain: {curr_gain}")
@@ -106,53 +105,40 @@ class TreeNode:
         self.children[value] = node
 
     def print_tree(self):
-        """Print all nodes of tree (parent with children below)"""
+        """Print all nodes of tree (parent with children below)."""
         print("\n" + self.name + "?")
-        # print(self.children)
         print([f"{key}: Tree({c.name})" if isinstance(c, TreeNode) else f"{key}: {c}" for key, c in self.children.items()])
 
+        # Traverse subtrees if any exist.
         for child in self.children.values():
             if isinstance(child, TreeNode):
                 child.print_tree()
 
 
 class Attribute():
-    """Class to house details about a particular attribute as the decision tree."""
+    """Class to house details about a particular attribute and distribution of types."""
     def __init__(self, name, outputs, col_idx):
-        self.name = name
-        self.col_idx = col_idx
+        self.name = name        # Name of attribute used for tree labeling.
+        self.col_idx = col_idx  # Column of input data corresponding to attribute.
 
-        # Find all unique types of attribute
+        # Find all unique types of attribute and initialize frequencies to 0.
         self.types = np.unique(outputs)
-        self.type_count = {}
-        for t in self.types:
-            self.type_count.setdefault(t, [0, 0, 0])
-
-        # Set initial frequencies
-        # self.update_counts(outputs, outcomes)
+        self.type_count = {a_type: [0, 0, 0] for a_type in self.types}
 
     def update_counts(self, outputs, outcomes):
         """Given a row of all outputs for this attribute and outcomes for those outputs, store frequencies of
         each output value."""
 
         # Create a dictionary of outcomes per type, defaulted to 0
-        self.types = np.unique(outputs)
         self.type_count.clear()
-        # for t in self.types:
-            # self.type_count.setdefault(t, [0, 0, 0])
-        # self.type_count = defaultdict([0, 0, 0])
         self.type_count = {a_type: [0, 0, 0] for a_type in self.types}
         # print(f'--------------{self.name} types: {self.types}--------------\n')
         for i, a_type in enumerate(outputs):
-            # print(f'ith output: {outputs[i]}, a_type: {a_type}')
             if outcomes[i]:
                 self.type_count[a_type][0] += 1     # Positive
             else:
                 self.type_count[a_type][1] += 1     # Negative
             self.type_count[a_type][2] += 1         # Total
-        # for key, val in list(self.type_count.items()):
-        #     if val[2] == 0:
-        #         del self.type_count[key]
         # print(f'{self.name} frequencies [p, k, v]: {self.type_count}\n')
 
 
@@ -164,7 +150,6 @@ def goal_entropy(examples):
     # Calculate probability of true/false
     prob_p = counts[1] / examples.shape[0]
     prob_n = 1 - prob_p
-    # print(f"Positive prob {prob_p}, Negative prob {prob_n}")
 
     # Calculate and return goal entropy of this example subset.
     # Note: A H(goal) of 1 means that there are equal # of positive and negative examples
@@ -176,17 +161,17 @@ def aggregate_entropy(attribute, example_count):
     """Calculate the entropy values of each type of an attribute and return aggregate entropy."""
     weighted_sum = 0
     for k in attribute.types:
-        print(f'({attribute.name}, {k}):')
+        # print(f'({attribute.name}, {k}):')
         vk = attribute.type_count[k][2]
+        if vk != 0:
+            prob_p = attribute.type_count[k][0] / vk
+            prob_n = attribute.type_count[k][1] / vk
+            with np.errstate(divide='ignore', invalid='ignore'): # TODO: Can we safely ignore these warnings?
+                entropy = np.nan_to_num(-prob_p * np.log2(prob_p) - prob_n * np.log2(prob_n))
+            # print(f'Probability (+, -): ({prob_p:.2f}, {prob_n: .2f})\nEntropy: {entropy:.2f}\n')
 
-        prob_p = attribute.type_count[k][0] / vk
-        prob_n = attribute.type_count[k][1] / vk
-        with np.errstate(divide='ignore', invalid='ignore'): # TODO: Can we safely ignore these warnings?
-            entropy = np.nan_to_num(-prob_p * np.log2(prob_p) - prob_n * np.log2(prob_n))
-        # print(f'Probability (+, -): ({prob_p:.2f}, {prob_n: .2f})\nEntropy: {entropy:.2f}\n')
-
-        # 'weight' the sum of the type entropies.
-        weighted_sum += (vk / example_count) * entropy
+            # 'weight' the sum of the type entropies.
+            weighted_sum += (vk / example_count) * entropy
     # print(f'* ({attribute.name}) Aggregate entropy: {weighted_sum}\n')
     return weighted_sum
 
@@ -202,29 +187,18 @@ if __name__ == '__main__':
 
     # Read in all attributes, AND the outcome in the last index
     EXAMPLES = np.array(data[1:, 1:ATTRIBUTE_COUNT+1], dtype=str)
-
     ###### Special cases for testing ######
     # EXAMPLES = np.append(EXAMPLES, [EXAMPLES[0]], axis=0) # Unbalanced data set
     # print(EXAMPLES)
     # EXAMPLES = EXAMPLES[0]    # A single example data set
     ######################################
-
     EXAMPLES = np.atleast_2d(EXAMPLES)  # Ensure that a 1D array is still treated as 2D in all calculations.
 
-    # mode(EXAMPLES)
-    # print(all_classes_same(EXAMPLES))
-
-    # # Goal entropy of ENTIRE data set
-    # print(f'--------------Goal entropy of ENTIRE data set: {goal_entropy(EXAMPLES):.2f}--------------\n\n')
-    #
     attributes = {}
     for i in range(0, EXAMPLES.shape[1] - 1):
         attributes[ATTRIBUTE_NAMES[i]] = Attribute(ATTRIBUTE_NAMES[i], EXAMPLES[:, i].T, i)
-    #
-    #     # Perform sample calculations of entropy on scanned examples
-    #     aggregate_entropy(attributes[ATTRIBUTE_NAMES[i]], EXAMPLES.shape[0])
-    #
-    # # Example tree node for textbook example
+
+    # print(f'--------------Example Tree from Textbook--------------')
     # root = TreeNode("Patrons")
     # hungry = TreeNode("Hungry")
     # root.children = {"None": False, "Some": True, "Full": hungry}
@@ -233,22 +207,11 @@ if __name__ == '__main__':
     # fri_sat = TreeNode("Fri/Sat")
     # typ.children = {"French": True, "Italian": False, "Thai": fri_sat, "Burger": True}
     # fri_sat.children = {0: False, 1: True}
-    #
-    # print(f'--------------Example Tree from Textbook--------------')
     # root.print_tree()
-    #
-    # print(f"Attribute count: {EXAMPLES.shape[1]}")
-    # print(f"Example count: {EXAMPLES.shape[0]}")
-
-    # subset = get_examples_by_type(EXAMPLES, "$$$", attributes["Price"].col_idx)
-    # print(subset)
-    #
-    # best = choose_best_attribute(attributes, EXAMPLES)
-    # print(best.name)
-
-    # Build tree through "learning"
-    print(EXAMPLES[1, -1])
-    print(bool(int(EXAMPLES[1, -1])))
 
     root = DTL(EXAMPLES, attributes, None)
-    root.print_tree()
+
+    try:
+        root.print_tree()
+    except AttributeError:
+        print(f"Single example encountered, defaulting to outcome {root}")
