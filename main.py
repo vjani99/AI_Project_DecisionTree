@@ -3,6 +3,7 @@ import numpy as np
 from sys import maxsize
 from random import randint
 from sklearn.metrics import classification_report
+import matplotlib.pyplot as plt
 
 
 def DTL(examples, attributes, default):
@@ -207,6 +208,30 @@ def aggregate_entropy(attribute, example_count):
     return weighted_sum
 
 
+def leave_one_out_validate(true_tree, examples):
+    validation_runs = examples.shape[0]
+    predictions = []
+    test_labels = []
+    for i in range(validation_runs):
+        # Shuffle examples and exclude last element for validation set.
+        np.random.shuffle(examples)
+        validation_set = examples[:-1, :]
+        test_example = examples[-1]
+        print(f'Run {i + 1}, leaving out: {test_example}')
+
+        # Learn on reduced set of examples.
+        tree = DTL(validation_set, attributes_dict, None)
+
+        # TODO: Predict unknown label using validation DT and store it
+        predictions.append(bool(randint(0,1)))
+        # predictions.append(predict_outcome(tree, test_example))
+
+        # TODO: Get known label from original learned DT and store it
+        test_labels.append(bool(randint(0, 1)))
+        # test_labels.append(predict_outcome(true_tree, test_example))
+    return np.array(predictions), np.array(test_labels)
+
+
 if __name__ == '__main__':
     # Read in examples from formatted .csv file.
     data = pd.read_csv('data/figure_18-3.csv', sep=',', header=None).to_numpy()
@@ -248,26 +273,6 @@ if __name__ == '__main__':
     except AttributeError:
         print(f"Single example encountered, defaulting to single outcome: {root}")
 
-    VALIDATION_RUNS = EXAMPLES.shape[0]
-    predictions = []
-    test_labels = []
-    for i in range(VALIDATION_RUNS):
-        print(f'Run {i+1}:')
-        np.random.shuffle(EXAMPLES)
-
-        validation_set = EXAMPLES[:-1, :]
-        test_example = EXAMPLES[-1]
-        print(f"Leaving out: {test_example}")
-
-        # TODO: Learn remaining set
-        tree = DTL(EXAMPLES, attributes_dict, None)
-
-        # TODO: Predict for validation set
-        # predictions.append(predict_outcome(tree, test_example))
-
-        # TODO: Get known label
-        # test_labels.append(predict_outcome(root, test_example))
-    predictions = np.array(predictions)
-    test_labels = np.array(test_labels)
-    # print(classification_report(test_labels, predictions))
-
+    true_outcomes, pred_outcomes = leave_one_out_validate(root, EXAMPLES)
+    print(classification_report(true_outcomes, pred_outcomes))
+    plt.figure()
