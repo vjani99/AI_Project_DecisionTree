@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 from sys import maxsize
 from random import randint
+from sklearn.metrics import classification_report
 
 
 def DTL(examples, attributes, default):
@@ -208,7 +209,7 @@ def aggregate_entropy(attribute, example_count):
 
 if __name__ == '__main__':
     # Read in examples from formatted .csv file.
-    data = pd.read_csv('data/simplified-figure_18-3.csv', sep=',', header=None).to_numpy()
+    data = pd.read_csv('data/figure_18-3.csv', sep=',', header=None).to_numpy()
 
     # Constants related to data read in.
     ATTRIBUTE_COUNT = data.shape[1] - 1
@@ -246,3 +247,27 @@ if __name__ == '__main__':
         root.print_tree()
     except AttributeError:
         print(f"Single example encountered, defaulting to single outcome: {root}")
+
+    VALIDATION_RUNS = EXAMPLES.shape[0]
+    predictions = []
+    test_labels = []
+    for i in range(VALIDATION_RUNS):
+        print(f'Run {i+1}:')
+        np.random.shuffle(EXAMPLES)
+
+        validation_set = EXAMPLES[:-1, :]
+        test_example = EXAMPLES[-1]
+        print(f"Leaving out: {test_example}")
+
+        # TODO: Learn remaining set
+        tree = DTL(EXAMPLES, attributes_dict, None)
+
+        # TODO: Predict for validation set
+        # predictions.append(predict_outcome(tree, test_example))
+
+        # TODO: Get known label
+        # test_labels.append(predict_outcome(root, test_example))
+    predictions = np.array(predictions)
+    test_labels = np.array(test_labels)
+    # print(classification_report(test_labels, predictions))
+
