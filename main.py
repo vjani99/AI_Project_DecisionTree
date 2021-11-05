@@ -1,29 +1,28 @@
-from collections import defaultdict
-
 import pandas as pd
 import numpy as np
 from sys import maxsize
+from random import randint
 
 
 def DTL(examples, attributes, default):
-    """Implement a learning mode for decision tree via the DTL algorithm."""
+    """Implement a learning mode for decision tree via the DTL algorithm.
+        :param examples - 2D Numpy array of training examples, with outcome in last column
+        :param attributes - Dictionary of name:Attribute() pairs
+        :param default - default value to return if no examples left to consider
+    """
     if examples.size == 0:
-        # print(f"No more examples left for attributes: {attributes}")
         return default
     elif all_classes_same(examples):
         # Since we know all classes are same, just return classification of first example
-        # print(f"All classification are the same for: {attributes}")
         return bool(int(examples[0, -1]))
     elif not attributes:
-        # print(f"No attributes left for remaining examples: {examples}")
         return mode(examples)
     else:
         # Update the frequencies of attribute types with new set of examples
         for a in attributes.values():
-            a.update_counts(examples[:, a.col_idx].T, get_outcomes(examples))
+            a.update_counts(examples)
 
         best = choose_best_attribute(attributes, examples)
-        # print(f"Best attribute: {best.name}")
         tree = TreeNode(best.name)
 
         # Remove best attribute from dictionary (copy) for all subtrees.
@@ -31,7 +30,7 @@ def DTL(examples, attributes, default):
         del subset_attributes[best.name]
 
         # Divide examples by the types of the best attribute.
-        for val in best.types:
+        for val in best.type_names:
             ex_val_subset = get_examples_by_type(examples, val, best.col_idx)
             sub_tree = DTL(ex_val_subset, subset_attributes, mode(examples))
             tree.add_branch(val, sub_tree)
@@ -45,17 +44,16 @@ def get_examples_by_type(examples, a_type, a_col_idx):
 
 def mode(examples):
     """Get most common outcome in the examples, either true or false."""
-    outcomes = get_outcomes(examples)    # Extract row of all outcomes
-    counts = np.bincount(outcomes)       # Count occurrences of 0/1
+    outcomes = get_outcomes(examples)  # Extract column of all outcomes into a 1D array.
+    counts = np.bincount(outcomes)  # Count occurrences of 0/1 in 1D array.
 
-    # print(f"counts {counts}")
+    # If tie in mode, randomly choose 1 or 0.
     if counts.size != 1 and counts[0] == counts[1]:
-        print("Tie in outcomes, defaulting to False")
-    # TODO: This ALWAYS chooses the first max calculated for tie-breaking (0)... may want to randomize
-    mode = counts.argmax()
-    # print(f"Mode {mode}")
+        mode = randint(0, 1)
+    else:
+        mode = counts.argmax()
 
-    return bool(mode)    # Calculate mode and return as a boolean
+    return bool(mode)  # Calculate mode and return as a boolean
 
 
 def get_outcomes(examples):
@@ -65,8 +63,8 @@ def get_outcomes(examples):
 
 def all_classes_same(examples):
     """Return whether the outcomes of each example are all the same"""
-    outcomes = get_outcomes(examples)           # Extract row of all outcomes
-    return np.all(outcomes == outcomes[0])      # Return whether all occurrences are the same
+    outcomes = get_outcomes(examples)  # Extract row of all outcomes
+    return np.all(outcomes == outcomes[0])  # Return whether all occurrences are the same
 
 
 def choose_best_attribute(att_dict, examples):
@@ -94,7 +92,10 @@ def info_gain(attribute, examples):
 
 
 class TreeNode:
-    """A data structure for a node in a directed decision tree"""
+    """A data structure for a node in a directed decision tree
+        :param name - String name to label current node with.
+    """
+
     def __init__(self, name):
         """Initialize a node with a dictionary of children and it's name"""
         self.children = {}
@@ -107,7 +108,8 @@ class TreeNode:
     def print_tree(self):
         """Print all nodes of tree (parent with children below)."""
         print("\n" + self.name + "?")
-        print([f"{key}: Tree({c.name})" if isinstance(c, TreeNode) else f"{key}: {c}" for key, c in self.children.items()])
+        print([f"{key}: Tree({c.name})" if isinstance(c, TreeNode)
+               else f"{key}: {c}" for key, c in self.children.items()])
 
         # Traverse subtrees if any exist.
         for child in self.children.values():
@@ -115,31 +117,59 @@ class TreeNode:
                 child.print_tree()
 
 
-class Attribute():
-    """Class to house details about a particular attribute and distribution of types."""
-    def __init__(self, name, outputs, col_idx):
-        self.name = name        # Name of attribute used for tree labeling.
-        self.col_idx = col_idx  # Column of input data corresponding to attribute.
+class Attribute:
+    """Class to house details about a particular attribute and distribution of types.
+        :param name - String name of attribute used for tree labeling.
+        :param examples - 2D array of training examples.
+        :param col_idx - Column in examples, corresponding to attribute values.
+    """
+
+    def __init__(self, name, examples, col_idx):
+        self.name = name
+        self.col_idx = col_idx
 
         # Find all unique types of attribute and initialize frequencies to 0.
-        self.types = np.unique(outputs)
-        self.type_count = {a_type: [0, 0, 0] for a_type in self.types}
+        outputs = self.get_column(examples)
+        self.type_names = np.unique(outputs)
+        self.types = {a_type: Type() for a_type in self.type_names}
 
-    def update_counts(self, outputs, outcomes):
-        """Given a row of all outputs for this attribute and outcomes for those outputs, store frequencies of
-        each output value."""
+    def update_counts(self, examples):
+        """Update frequencies of each output value corresponding to this set of examples."""
+        outputs = self.get_column(examples)
+        outcomes = get_outcomes(examples)
 
-        # Create a dictionary of outcomes per type, defaulted to 0
-        self.type_count.clear()
-        self.type_count = {a_type: [0, 0, 0] for a_type in self.types}
-        # print(f'--------------{self.name} types: {self.types}--------------\n')
-        for i, a_type in enumerate(outputs):
-            if outcomes[i]:
-                self.type_count[a_type][0] += 1     # Positive
+        # Reset type frequencies and recount with new set of examples
+        self.reset_type_frequencies()
+        # print(f'--------------{self.name} types: {self.type_names}--------------\n')
+        for k, a_type in enumerate(outputs):
+            if outcomes[k]:
+                self.types[a_type].p += 1  # Positive
             else:
-                self.type_count[a_type][1] += 1     # Negative
-            self.type_count[a_type][2] += 1         # Total
+                self.types[a_type].n += 1  # Negative
+            self.types[a_type].v += 1  # Total
         # print(f'{self.name} frequencies [p, k, v]: {self.type_count}\n')
+
+    def reset_type_frequencies(self):
+        """Clear the frequencies of each type corresponding to this attribute."""
+        for t in self.types.values():
+            t.reset()
+
+    def get_column(self, examples):
+        """Extract column of outputs related to this this attribute as a 1D array."""
+        return examples[:, self.col_idx].T
+
+
+class Type:
+    """Data structure to hold positive, negative, and total counts of an attribute type."""
+
+    def __init__(self):
+        self.p = 0
+        self.n = 0
+        self.v = 0
+
+    def reset(self):
+        """Re-initialize all frequencies to 0."""
+        self.__init__()
 
 
 def goal_entropy(examples):
@@ -160,13 +190,13 @@ def goal_entropy(examples):
 def aggregate_entropy(attribute, example_count):
     """Calculate the entropy values of each type of an attribute and return aggregate entropy."""
     weighted_sum = 0
-    for k in attribute.types:
+    for k in attribute.type_names:
         # print(f'({attribute.name}, {k}):')
-        vk = attribute.type_count[k][2]
+        vk = attribute.types[k].v
         if vk != 0:
-            prob_p = attribute.type_count[k][0] / vk
-            prob_n = attribute.type_count[k][1] / vk
-            with np.errstate(divide='ignore', invalid='ignore'): # TODO: Can we safely ignore these warnings?
+            prob_p = attribute.types[k].p / vk
+            prob_n = attribute.types[k].n / vk
+            with np.errstate(divide='ignore', invalid='ignore'):  # TODO: Can we safely ignore these warnings?
                 entropy = np.nan_to_num(-prob_p * np.log2(prob_p) - prob_n * np.log2(prob_n))
             # print(f'Probability (+, -): ({prob_p:.2f}, {prob_n: .2f})\nEntropy: {entropy:.2f}\n')
 
@@ -185,8 +215,8 @@ if __name__ == '__main__':
     EXAMPLE_COUNT = data.shape[0] - 1
     ATTRIBUTE_NAMES = np.array(data[0, 1:], dtype=str)
 
-    # Read in all attributes, AND the outcome in the last index
-    EXAMPLES = np.array(data[1:, 1:ATTRIBUTE_COUNT+1], dtype=str)
+    # Read in all attributes, AND the outcome in the last index. Skips first row of table headers.
+    EXAMPLES = np.array(data[1:, 1:ATTRIBUTE_COUNT + 1], dtype=str)
     ###### Special cases for testing ######
     # EXAMPLES = np.append(EXAMPLES, [EXAMPLES[0]], axis=0) # Unbalanced data set
     # print(EXAMPLES)
@@ -194,9 +224,9 @@ if __name__ == '__main__':
     ######################################
     EXAMPLES = np.atleast_2d(EXAMPLES)  # Ensure that a 1D array is still treated as 2D in all calculations.
 
-    attributes = {}
+    attributes_dict = {}
     for i in range(0, EXAMPLES.shape[1] - 1):
-        attributes[ATTRIBUTE_NAMES[i]] = Attribute(ATTRIBUTE_NAMES[i], EXAMPLES[:, i].T, i)
+        attributes_dict[ATTRIBUTE_NAMES[i]] = Attribute(ATTRIBUTE_NAMES[i], EXAMPLES, i)
 
     # print(f'--------------Example Tree from Textbook--------------')
     # root = TreeNode("Patrons")
@@ -209,9 +239,10 @@ if __name__ == '__main__':
     # fri_sat.children = {0: False, 1: True}
     # root.print_tree()
 
-    root = DTL(EXAMPLES, attributes, None)
+    """---------------------- Learning mode: Construct tree using the DTL algorithm ----------------------"""
+    root = DTL(EXAMPLES, attributes_dict, None)
 
     try:
         root.print_tree()
     except AttributeError:
-        print(f"Single example encountered, defaulting to outcome {root}")
+        print(f"Single example encountered, defaulting to single outcome: {root}")
