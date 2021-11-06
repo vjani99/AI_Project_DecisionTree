@@ -2,6 +2,8 @@ import pandas as pd
 import numpy as np
 from sys import maxsize
 from random import randint
+from sklearn.metrics import classification_report
+import matplotlib.pyplot as plt
 
 
 def DTL(examples, attributes, default):
@@ -206,9 +208,46 @@ def aggregate_entropy(attribute, example_count):
     return weighted_sum
 
 
+def leave_one_out_validate(true_tree, examples):
+    """Use randomized leave-one-out validation for length of example set and return predictions and true labels."""
+    val_runs = examples.shape[0]
+    predictions = []
+    test_labels = []
+    for v in range(val_runs):
+        # Shuffle examples and exclude last element from validation set.
+        np.random.shuffle(examples)
+        val_examples = examples[:-1, :]
+        test_example = examples[-1]
+        print(f'Run {v + 1}, leaving out: {test_example}')
+
+        # Learn on reduced set of examples.
+        val_tree = DTL(val_examples, attributes_dict, None)
+
+        # TODO: Predict unknown label using validation DT and store it
+        predictions.append(bool(randint(0,1)))
+        # predictions.append(predict_outcome(val_tree, test_example))
+
+        # TODO: Get known label from original learned DT and store it
+        test_labels.append(bool(randint(0, 1)))
+        # test_labels.append(predict_outcome(true_tree, test_example))
+    return np.array(test_labels), np.array(predictions)
+
+
+def read_from_csv(file_path):
+    """Read data from a CSV file into a 2D numpy array."""
+    return pd.read_csv(file_path, sep=',', header=None).to_numpy()
+
+
+def read_from_txt(file_path, separator='\t'):
+    """Read data from a text file into a 2D numpy array, based on specified separator."""
+    with open(file_path, "r") as text_file:
+        lines = [line.strip().split(separator) for line in text_file]
+        return np.array(lines)
+
+
 if __name__ == '__main__':
     # Read in examples from formatted .csv file.
-    data = pd.read_csv('data/simplified-figure_18-3.csv', sep=',', header=None).to_numpy()
+    data = read_from_csv('data/figure_18-3.csv')
 
     # Constants related to data read in.
     ATTRIBUTE_COUNT = data.shape[1] - 1
@@ -239,10 +278,15 @@ if __name__ == '__main__':
     # fri_sat.children = {0: False, 1: True}
     # root.print_tree()
 
-    """---------------------- Learning mode: Construct tree using the DTL algorithm ----------------------"""
+    print("\n---------------------- Learning mode: Construct tree using the DTL algorithm ----------------------")
     root = DTL(EXAMPLES, attributes_dict, None)
 
     try:
         root.print_tree()
     except AttributeError:
         print(f"Single example encountered, defaulting to single outcome: {root}")
+
+    print("\n---------------------- Validation mode: Use randomized leave-one-out method ----------------------")
+    true_outcomes, pred_outcomes = leave_one_out_validate(root, EXAMPLES)
+    print("\n" + classification_report(true_outcomes, pred_outcomes))
+    plt.figure()
