@@ -3,7 +3,13 @@ import numpy as np
 from sys import maxsize
 from random import randint
 from sklearn.metrics import classification_report
+from sklearn.metrics import confusion_matrix
+import seaborn as sn
 import matplotlib.pyplot as plt
+
+"""Data set sources:
+- heart (simplified): https://www.kaggle.com/ronitf/heart-disease-uci/version/1
+"""
 
 
 def DTL(examples, attributes, default):
@@ -218,7 +224,7 @@ def leave_one_out_validate(true_tree, examples):
         np.random.shuffle(examples)
         val_examples = examples[:-1, :]
         test_example = examples[-1]
-        print(f'Run {v + 1}, leaving out: {test_example}')
+        # print(f'Run {v + 1}, leaving out: {test_example}')
 
         # Learn on reduced set of examples.
         val_tree = DTL(val_examples, attributes_dict, None)
@@ -238,16 +244,16 @@ def read_from_csv(file_path):
     return pd.read_csv(file_path, sep=',', header=None).to_numpy()
 
 
-def read_from_txt(file_path, separator='\t'):
-    """Read data from a text file into a 2D numpy array, based on specified separator."""
+def read_from_txt(file_path):
+    """Read data from a text file into a 2D numpy array, using whitespace as separator"""
     with open(file_path, "r") as text_file:
-        lines = [line.strip().split(separator) for line in text_file]
+        lines = [line.split() for line in text_file.readlines()]
         return np.array(lines)
 
 
 if __name__ == '__main__':
     # Read in examples from formatted .csv file.
-    data = read_from_csv('data/figure_18-3.csv')
+    data = read_from_txt('data/figure_18-3.txt')
 
     # Constants related to data read in.
     ATTRIBUTE_COUNT = data.shape[1] - 1
@@ -267,17 +273,6 @@ if __name__ == '__main__':
     for i in range(0, EXAMPLES.shape[1] - 1):
         attributes_dict[ATTRIBUTE_NAMES[i]] = Attribute(ATTRIBUTE_NAMES[i], EXAMPLES, i)
 
-    # print(f'--------------Example Tree from Textbook--------------')
-    # root = TreeNode("Patrons")
-    # hungry = TreeNode("Hungry")
-    # root.children = {"None": False, "Some": True, "Full": hungry}
-    # typ = TreeNode("Type")
-    # hungry.children = {1: typ, 0: False}
-    # fri_sat = TreeNode("Fri/Sat")
-    # typ.children = {"French": True, "Italian": False, "Thai": fri_sat, "Burger": True}
-    # fri_sat.children = {0: False, 1: True}
-    # root.print_tree()
-
     print("\n---------------------- Learning mode: Construct tree using the DTL algorithm ----------------------")
     root = DTL(EXAMPLES, attributes_dict, None)
 
@@ -288,5 +283,9 @@ if __name__ == '__main__':
 
     print("\n---------------------- Validation mode: Use randomized leave-one-out method ----------------------")
     true_outcomes, pred_outcomes = leave_one_out_validate(root, EXAMPLES)
+
+    # Print and plot quality metrics
     print("\n" + classification_report(true_outcomes, pred_outcomes))
-    plt.figure()
+    sn.heatmap(confusion_matrix(true_outcomes, pred_outcomes), annot=True)
+    plt.show()
+
