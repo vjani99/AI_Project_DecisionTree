@@ -7,7 +7,7 @@ from sklearn.metrics import confusion_matrix
 import seaborn as sn
 import matplotlib.pyplot as plt
 
-"""Data set sources:
+"""Test data set source:
 - heart (simplified): https://www.kaggle.com/ronitf/heart-disease-uci/version/1
 """
 
@@ -252,7 +252,7 @@ def read_from_txt(file_path):
 
 
 if __name__ == '__main__':
-    # Read in examples from formatted .csv file.
+    # Read in examples from formatted .txt file.
     data = read_from_txt('data/figure_18-3.txt')
 
     # Constants related to data read in.
@@ -288,4 +288,3 @@ if __name__ == '__main__':
     print("\n" + classification_report(true_outcomes, pred_outcomes))
     sn.heatmap(confusion_matrix(true_outcomes, pred_outcomes), annot=True)
     plt.show()
-
