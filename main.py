@@ -257,8 +257,8 @@ def read_from_txt(file_path):
 
 
 if __name__ == '__main__':
-    # Read in examples from formatted .csv file.
-    data = read_from_txt('data/heart.txt')
+    # Read in examples from formatted .txt file.
+    data = read_from_txt('data/figure_18-3.txt')
 
     # Constants related to data read in.
     ATTRIBUTE_COUNT = data.shape[1] - 1
@@ -286,13 +286,8 @@ if __name__ == '__main__':
 
     print("\n---------------------- Validation mode: Use randomized leave-one-out method ----------------------")
     true_outcomes, pred_outcomes = leave_one_out_validate(root, EXAMPLES, attributes_dict)
-    # print("Predicted labels: ")
-    # print(pred_outcomes)
-    # print("Known labels: ")
-    # print(true_outcomes)
 
     # Print and plot quality metrics
     print("\n" + classification_report(true_outcomes, pred_outcomes))
     sn.heatmap(confusion_matrix(true_outcomes, pred_outcomes), annot=True)
     plt.show()
-
