@@ -7,10 +7,6 @@ from sklearn.metrics import confusion_matrix
 import seaborn as sn
 import matplotlib.pyplot as plt
 
-"""Data set sources:
-- heart (simplified): https://www.kaggle.com/ronitf/heart-disease-uci/version/1
-"""
-
 
 def DTL(examples, attributes, default):
     """Implement a learning mode for decision tree via the DTL algorithm.
@@ -52,8 +48,8 @@ def get_examples_by_type(examples, a_type, a_col_idx):
 
 def mode(examples):
     """Get most common outcome in the examples, either true or false."""
-    outcomes = get_outcomes(examples)  # Extract column of all outcomes into a 1D array.
-    counts = np.bincount(outcomes)  # Count occurrences of 0/1 in 1D array.
+    outcomes = get_outcomes(examples)   # Extract column of all outcomes into a 1D array.
+    counts = np.bincount(outcomes)      # Count occurrences of 0/1 in 1D array.
 
     # If tie in mode, randomly choose 1 or 0.
     if counts.size != 1 and counts[0] == counts[1]:
@@ -82,7 +78,6 @@ def choose_best_attribute(att_dict, examples):
 
     for a in att_dict.values():
         curr_gain = info_gain(a, examples)
-        # print(f"{a.name} info gain: {curr_gain}")
         if curr_gain > max_info_gain:
             max_info_gain = curr_gain
             best_attribute = a
@@ -92,10 +87,6 @@ def choose_best_attribute(att_dict, examples):
 def info_gain(attribute, examples):
     goal = goal_entropy(examples)
     aggregate = aggregate_entropy(attribute, examples.shape[0])
-    # print(f'Remaining Examples: {examples.shape[0]}')
-    # print(f'Attribute {attribute.name}: {attribute.type_count}')
-    # print(f'Goal Entropy: {goal}')
-    # print(f'Aggregate Entropy: {aggregate}')
     return goal - aggregate
 
 
@@ -214,7 +205,23 @@ def aggregate_entropy(attribute, example_count):
     return weighted_sum
 
 
-def leave_one_out_validate(true_tree, examples):
+def predict_outcome(tree, example, attributes):
+    """Given a learned tree and example, return the outcome."""
+    # Traverse subtrees if any exist.
+    if isinstance(tree, TreeNode):
+        name = tree.name
+        a = attributes[name]
+        outcome = example[a.col_idx]
+        try:
+            return predict_outcome(tree.children[outcome], example, attributes)
+        except KeyError:
+            print(f"ERROR: {name} not used in tree, returning False")
+            return False
+    else:   # Boolean value
+        return tree
+
+
+def leave_one_out_validate(true_tree, examples, att_dict):
     """Use randomized leave-one-out validation for length of example set and return predictions and true labels."""
     val_runs = examples.shape[0]
     predictions = []
@@ -229,13 +236,11 @@ def leave_one_out_validate(true_tree, examples):
         # Learn on reduced set of examples.
         val_tree = DTL(val_examples, attributes_dict, None)
 
-        # TODO: Predict unknown label using validation DT and store it
-        predictions.append(bool(randint(0,1)))
-        # predictions.append(predict_outcome(val_tree, test_example))
+        # Predict unknown label using validation DT and store it
+        predictions.append(predict_outcome(val_tree, test_example, att_dict))
 
-        # TODO: Get known label from original learned DT and store it
-        test_labels.append(bool(randint(0, 1)))
-        # test_labels.append(predict_outcome(true_tree, test_example))
+        # Get known label from original learned DT and store it
+        test_labels.append(predict_outcome(true_tree, test_example, att_dict))
     return np.array(test_labels), np.array(predictions)
 
 
@@ -253,7 +258,7 @@ def read_from_txt(file_path):
 
 if __name__ == '__main__':
     # Read in examples from formatted .csv file.
-    data = read_from_txt('data/figure_18-3.txt')
+    data = read_from_txt('data/heart.txt')
 
     # Constants related to data read in.
     ATTRIBUTE_COUNT = data.shape[1] - 1
@@ -262,12 +267,10 @@ if __name__ == '__main__':
 
     # Read in all attributes, AND the outcome in the last index. Skips first row of table headers.
     EXAMPLES = np.array(data[1:, 1:ATTRIBUTE_COUNT + 1], dtype=str)
-    ###### Special cases for testing ######
-    # EXAMPLES = np.append(EXAMPLES, [EXAMPLES[0]], axis=0) # Unbalanced data set
-    # print(EXAMPLES)
-    # EXAMPLES = EXAMPLES[0]    # A single example data set
-    ######################################
     EXAMPLES = np.atleast_2d(EXAMPLES)  # Ensure that a 1D array is still treated as 2D in all calculations.
+
+    # Goal entropy for full set of examples
+    print(f"Goal entropy for table: {goal_entropy(EXAMPLES)}")
 
     attributes_dict = {}
     for i in range(0, EXAMPLES.shape[1] - 1):
@@ -282,7 +285,11 @@ if __name__ == '__main__':
         print(f"Single example encountered, defaulting to single outcome: {root}")
 
     print("\n---------------------- Validation mode: Use randomized leave-one-out method ----------------------")
-    true_outcomes, pred_outcomes = leave_one_out_validate(root, EXAMPLES)
+    true_outcomes, pred_outcomes = leave_one_out_validate(root, EXAMPLES, attributes_dict)
+    # print("Predicted labels: ")
+    # print(pred_outcomes)
+    # print("Known labels: ")
+    # print(true_outcomes)
 
     # Print and plot quality metrics
     print("\n" + classification_report(true_outcomes, pred_outcomes))
