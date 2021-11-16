@@ -7,6 +7,12 @@ from sklearn.metrics import confusion_matrix
 import seaborn as sn
 import matplotlib.pyplot as plt
 
+# NOTE: This program assumes that BOTH the columns and rows are labeled,
+# IGNORING the first row and column when reading in data.
+
+# Change this to read in a different table.
+FILE_PATH = 'data/figure_18-3.txt'
+
 
 def DTL(examples, attributes, default):
     """Implement a learning mode for decision tree via the DTL algorithm.
@@ -258,14 +264,14 @@ def read_from_txt(file_path):
 
 if __name__ == '__main__':
     # Read in examples from formatted .txt file.
-    data = read_from_txt('data/figure_18-3.txt')
+    data = read_from_txt(FILE_PATH)
 
     # Constants related to data read in.
     ATTRIBUTE_COUNT = data.shape[1] - 1
     EXAMPLE_COUNT = data.shape[0] - 1
     ATTRIBUTE_NAMES = np.array(data[0, 1:], dtype=str)
 
-    # Read in all attributes, AND the outcome in the last index. Skips first row of table headers.
+    # Read in all attributes, AND the outcome in the last index. Skips first row and column of table headers.
     EXAMPLES = np.array(data[1:, 1:ATTRIBUTE_COUNT + 1], dtype=str)
     EXAMPLES = np.atleast_2d(EXAMPLES)  # Ensure that a 1D array is still treated as 2D in all calculations.
 
