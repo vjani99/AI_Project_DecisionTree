@@ -1,1 +1,2 @@
 # AI Project Decision Tree
+This program implement the decision tree learning (DTL) algorithm outlined in _Artificial Intelligence: A Modern Approach_, by Peter Norvig and Stuart J. Russell. Training is performed using _Leave-out-one-validation_. The program contains functions for reading in labeled .txt and .csv files, and includes a few examples in the **data/** directory. Prediction results are displayed using a heatmap for visualization.
